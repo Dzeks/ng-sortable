@@ -29,7 +29,7 @@
     $scope.insertItem = function (index, itemData) {
       var newValue = angular.copy($scope.modelValue);
       newValue.splice(index, 0, itemData);
-      $scope.ngModelCtrl.$setViewValue(newValue);
+      $scope.ngModel.$setViewValue(newValue);
     };
 
     /**
