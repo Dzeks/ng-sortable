@@ -337,7 +337,9 @@
      * @param itemData - the item model data.
      */
     $scope.insertItem = function (index, itemData) {
-      $scope.modelValue.splice(index, 0, itemData);
+      var newValue = angular.copy($scope.modelValue);
+      newValue.splice(index, 0, itemData);
+      $scope.ngModelCtrl.$setViewValue(newValue);
     };
 
     /**
@@ -389,15 +391,12 @@
         restrict: 'A',
         scope: true,
         controller: 'ui.sortable.sortableController',
-        link: function (scope, element, attrs, ngModelController) {
+        link: function (scope, element, attrs, ngModel) {
+          var callbacks;
 
-          var ngModel, callbacks;
-
-          ngModel = ngModelController;
-
-          if (!ngModel) {
-            return; // do nothing if no ng-model
-          }
+          // Update currently is called from controller
+          // ideally should be done here
+          scope.ngModel = ngModel;
 
           // Set the model value in to scope.
           ngModel.$render = function () {
