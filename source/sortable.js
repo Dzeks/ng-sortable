@@ -15,36 +15,9 @@
     this.scope = $scope;
 
     $scope.modelValue = null; // sortable list.
-    $scope.callbacks = null;
     $scope.type = 'sortable';
     $scope.options = {};
     $scope.isDisabled = false;
-
-    /**
-     * Inserts the item in to the sortable list.
-     *
-     * @param index - the item index.
-     * @param itemData - the item model data.
-     */
-    $scope.insertItem = function (index, itemData) {
-      var newValue = angular.copy($scope.modelValue);
-      newValue.splice(index, 0, itemData);
-      $scope.ngModel.$setViewValue(newValue);
-    };
-
-    /**
-     * Removes the item from the sortable list.
-     *
-     * @param index - index to be removed.
-     * @returns {*} - removed item.
-     */
-    $scope.removeItem = function (index) {
-      var removedItem = null;
-      if (index > -1) {
-        removedItem = $scope.modelValue.splice(index, 1)[0];
-      }
-      return removedItem;
-    };
 
     /**
      * Checks whether the sortable list is empty.
@@ -74,109 +47,125 @@
    * Parent directive for draggable and sortable items.
    * Sets modelValue, callbacks, element in scope.
    */
-  mainModule.directive('asSortable',
-    function () {
+  mainModule.directive('asSortable', function () {
+
+      function sortableLink(scope, element, attrs, ngModel) {
+
+        /**
+         * ngModel handlers
+         */
+        function reordered(event, info) {
+          var newCollection = angular.copy(ngModel.$viewValue),
+              replacedItem = newCollection[info.source.index];
+
+          newCollection.splice(info.source.index, 1);
+          newCollection.splice(info.dest.index, 0, replacedItem);
+
+          setModelValue(newCollection);
+        }
+        function moved(event, info) {
+          var newCollection = angular.copy(ngModel.$viewValue),
+              movedItem = newCollection[info.source.index];
+
+          // Item is always removed from ownCollection
+          newCollection.splice(info.source.index, 1);
+
+          info.dest.sortableScope.$emit('itemInserted', {
+            index: info.dest.index,
+            item: movedItem
+          });
+
+          setModelValue(newCollection);
+        }
+        function inserted(event, info) {
+          var newCollection = angular.copy(ngModel.$viewValue);
+
+          newCollection.splice(info.index, 0, info.item);
+          setModelValue(newCollection);
+        }
+        function setModelValue(value) {
+          ngModel.$setViewValue(value);
+        }
+        function ngModelRender() {
+          //set an empty array, in case if none is provided.
+          if (!ngModel.$modelValue || !angular.isArray(ngModel.$modelValue)) {
+            ngModel.$setViewValue([]);
+          }
+          scope.modelValue = ngModel.$modelValue;
+        }
+
+        /**
+         * Attributes
+         */
+        function updateDisabled(disabledState) {
+          if(!angular.isUndefined(disabledState)) {
+            scope.isDisabled = disabledState;
+          }
+        }
+        function updateOptions(options) {
+          angular.forEach(options, function setOption(value, key) {
+            if (callbacks[key] && typeof value === 'function') {
+              callbacks[key] = value;
+            } else {
+              scope.options[key] = value;
+            }
+          });
+          scope.callbacks = callbacks;
+        }
+
+        var callbacks = {};
+
+        // Update currently is called from controller
+        // ideally should be done here
+        scope.ngModel = ngModel;
+
+        // @TODO Subscribe to DragEnd event from here
+        scope.setModelValue = setModelValue;
+
+        // Set the model value in to scope.
+        ngModel.$render = ngModelRender;
+
+        // Set the element in scope to be accessed by its sub scope.
+        scope.element = element;
+
+        scope.$on('orderChanged', reordered);
+        scope.$on('itemMoved', moved);
+        scope.$on('itemInserted', inserted);
+
+        /**
+         * @TODO cut those callbacks if favor of scope events
+         */
+
+        /**
+         * Invoked to decide whether to allow drop.
+         *
+         * @param sourceItemHandleScope - the drag item handle scope.
+         * @param destSortableScope - the drop target sortable scope.
+         * @param destItemScope - the drop target item scope.
+         * @returns {boolean} - true if allowed for drop.
+         */
+        callbacks.accept = function accept(sourceItemHandleScope, destSortableScope, destItemScope) {
+          return true;
+        };
+
+        // Set the sortOptions callbacks else set it to default.
+        // NOTE: get rid of deep watch
+        scope.$watch(attrs.asSortable, updateOptions, true);
+
+        // Set isDisabled if attr is set, if undefined isDisabled = false
+        if(angular.isDefined(attrs.disabled)) {
+          scope.$watch(attrs.disabled, updateDisabled);
+        }
+      }
+      
       return {
-        require: 'ngModel', // get a hold of NgModelController
+        require: 'ngModel',
         restrict: 'A',
         scope: true,
         controller: 'ui.sortable.sortableController',
-        link: function (scope, element, attrs, ngModel) {
-          var callbacks;
-
-          // Update currently is called from controller
-          // ideally should be done here
-          scope.ngModel = ngModel;
-
-          // Set the model value in to scope.
-          ngModel.$render = function () {
-            //set an empty array, in case if none is provided.
-            if (!ngModel.$modelValue || !angular.isArray(ngModel.$modelValue)) {
-              ngModel.$setViewValue([]);
-            }
-            scope.modelValue = ngModel.$modelValue;
-          };
-          //set the element in scope to be accessed by its sub scope.
-          scope.element = element;
-
-          callbacks = {accept: null, orderChanged: null, itemMoved: null, dragStart: null, dragCancel: null, dragEnd: null};
-
-          /**
-           * Invoked to decide whether to allow drop.
-           *
-           * @param sourceItemHandleScope - the drag item handle scope.
-           * @param destSortableScope - the drop target sortable scope.
-           * @param destItemScope - the drop target item scope.
-           * @returns {boolean} - true if allowed for drop.
-           */
-          callbacks.accept = function (sourceItemHandleScope, destSortableScope, destItemScope) {
-            return true;
-          };
-
-          /**
-           * Invoked when order of a drag item is changed.
-           *
-           * @param event - the event object.
-           */
-          callbacks.orderChanged = function (event) {
-          };
-
-          /**
-           * Invoked when the item is moved to other sortable.
-           *
-           * @param event - the event object.
-           */
-          callbacks.itemMoved = function (event) {
-          };
-
-          /**
-           * Invoked when the drag started successfully.
-           *
-           * @param event - the event object.
-           */
-          callbacks.dragStart = function (event) {
-          };
-
-          /**
-           * Invoked when the drag cancelled.
-           *
-           * @param event - the event object.
-           */
-          callbacks.dragCancel = function (event) {
-          };
-
-          /**
-           * Invoked when the drag stopped.
-           *
-           * @param event - the event object.
-           */
-          callbacks.dragEnd = function (event) {
-          };
-
-          //Set the sortOptions callbacks else set it to default.
-          scope.$watch(attrs.asSortable, function (newVal, oldVal) {
-            angular.forEach(newVal, function (value, key) {
-              if (callbacks[key]) {
-                if (typeof value === 'function') {
-                  callbacks[key] = value;
-                }
-              } else {
-                scope.options[key] = value;
-              }
-            });
-            scope.callbacks = callbacks;
-          }, true);
-
-          // Set isDisabled if attr is set, if undefined isDisabled = false
-          if(angular.isDefined(attrs.isDisabled)) {
-            scope.$watch(attrs.isDisabled, function (newVal, oldVal) {
-              if(!angular.isUndefined(newVal)) {
-                scope.isDisabled = newVal;
-              }
-            }, true);
-          }
-        }
+        link: sortableLink
       };
+      
     });
 
 }());

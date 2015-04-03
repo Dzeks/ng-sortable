@@ -247,10 +247,6 @@
                   sortableScope: this.parent
                 }
               };
-            },
-            apply: function () {
-              this.sourceInfo.sortableScope.removeItem(this.sourceInfo.index); // Remove from source.
-              this.parent.insertItem(this.index, this.source.modelValue); // Insert in to destination.
             }
           };
         },

@@ -177,7 +177,7 @@
             $helper.movePosition(eventObj, dragElement, itemPosition, containment, containerPositioning, scrollableContainer);
 
             scope.sortableScope.$apply(function () {
-              scope.callbacks.dragStart(dragItemInfo.eventArgs());
+              scope.$emit('dragStart', dragItemInfo.eventArgs());
             });
             bindEvents();
           };
@@ -382,21 +382,22 @@
             if (dragElement) {
               //rollback all the changes.
               rollbackDragChanges();
-              // update model data
-              dragItemInfo.apply();
-              scope.sortableScope.$apply(function () {
-                if (dragItemInfo.isSameParent()) {
-                  if (dragItemInfo.isOrderChanged()) {
-                    scope.callbacks.orderChanged(dragItemInfo.eventArgs());
+
+              // update model data if there was a change
+              if (dragItemInfo.isOrderChanged() || !dragItemInfo.isSameParent()) {
+                scope.sortableScope.$apply(function () {
+                  if (dragItemInfo.isSameParent()) {
+                    scope.$emit('orderChanged', dragItemInfo.eventArgs());
+                  } else {
+                    scope.$emit('itemMoved', dragItemInfo.eventArgs());
                   }
-                } else {
-                  scope.callbacks.itemMoved(dragItemInfo.eventArgs());
-                }
-              });
-              scope.sortableScope.$apply(function () {
-                scope.callbacks.dragEnd(dragItemInfo.eventArgs());
-              });
+                  scope.$emit('dragEnd', dragItemInfo.eventArgs());
+                });
+              }
+
+
               dragItemInfo = null;
+
             }
             unBindEvents();
           };
@@ -417,7 +418,7 @@
               //rollback all the changes.
               rollbackDragChanges();
               scope.sortableScope.$apply(function () {
-                scope.callbacks.dragCancel(dragItemInfo.eventArgs());
+                scope.$emit('dragCancel', dragItemInfo.eventArgs());
               });
               dragItemInfo = null;
             }
